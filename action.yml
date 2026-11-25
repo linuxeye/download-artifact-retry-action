@@ -22,43 +22,47 @@ runs:
 
     - name: download artifact (try-1)
       id: download-1
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@v7
       continue-on-error: true
       with:
         name: ${{ inputs.name }}
         path: ${{ inputs.path }}
+
+    - name: Diagnose available artifacts
+      if: steps.download-1.outcome == 'failure'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "::warning::Download failed. Requested: ${{ inputs.name }}"
+        echo "Available artifacts in run ${{ github.run_id }}:"
+        gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+          --jq '.artifacts[] | "\(.id)  \(.name)  expired=\(.expired)"' \
+          || echo "::warning::Failed to list artifacts. Ensure the token has 'actions: read' permission."
+
+    - name: Wait before retry
+      if: steps.download-1.outcome == 'failure'
+      run: sleep 30
+      shell: bash
 
     - name: download artifact (try-2)
       id: download-2
-      uses: actions/download-artifact@v8
+      if: ${{ steps.download-1.outcome == 'failure' }}
+      uses: actions/download-artifact@v7
       continue-on-error: true
       with:
         name: ${{ inputs.name }}
         path: ${{ inputs.path }}
-      if: ${{ steps.download-1.outcome == 'failure' }}
+
+    - name: Wait before retry
+      if: steps.download-2.outcome == 'failure'
+      run: sleep 30
+      shell: bash
 
     - name: download artifact (try-3)
       id: download-3
-      uses: actions/download-artifact@v8
-      continue-on-error: true
-      with:
-        name: ${{ inputs.name }}
-        path: ${{ inputs.path }}
       if: ${{ steps.download-2.outcome == 'failure' }}
-
-    - name: download artifact (try-4)
-      id: download-4
-      uses: actions/download-artifact@v8
-      continue-on-error: true
+      uses: actions/download-artifact@v7
       with:
         name: ${{ inputs.name }}
         path: ${{ inputs.path }}
-      if: ${{ steps.download-3.outcome == 'failure' }}
-
-    - name: download artifact (try-5)
-      id: download-5
-      uses: actions/download-artifact@v8
-      with:
-        name: ${{ inputs.name }}
-        path: ${{ inputs.path }}
-      if: ${{ steps.download-4.outcome == 'failure' }}
